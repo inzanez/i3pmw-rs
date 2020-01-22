@@ -1,4 +1,4 @@
-use i3ipc::reply::Output;
+use i3ipc::reply::{Output, Node};
 use i3ipc::I3Connection;
 use std::collections::HashMap;
 use std::env;
@@ -53,20 +53,40 @@ fn create_workspaces(conn: &mut I3Connection, num: u32) -> String {
         // Sleep time, otherwise workspace creation might fail
         let sleep_time = time::Duration::from_millis(20);
         thread::sleep(sleep_time);
-
-     /*  let focus_command = format!("focus output {}", output);
-        let parent_command = format!("focus parent");
-        let create_command = format!("workspace --no-auto-back-and-forth {}", new_workspace);
-
-        Command::new("i3-msg").arg(focus_command).output()
-            .ok().expect("Failed to execute.");
-        Command::new("i3-msg").arg(parent_command).output()
-            .ok().expect("Failed to execute.");
-        Command::new("i3-msg").arg(create_command).output()
-            .ok().expect("Failed to execute.");*/
     }
 
     format!("{}.{}", num, current_num)
+}
+
+fn find_active_node(node: &Node) -> Option<&Node> {
+    for node in &node.nodes {
+        if node.focused == true {
+            return Some(node);
+        }
+    }
+
+    for node in &node.nodes {
+        if node.nodes.len() > 0 {
+            return find_active_node(node);
+        }
+    }
+
+    None
+}
+
+fn get_active_container_id(conn: &mut I3Connection) -> Option<i64> {
+    let tree = conn.get_tree().unwrap();
+
+    for node in &(tree.nodes) {
+        let active = find_active_node(node);
+
+        if active.is_some() {
+            let node = active.unwrap();
+            return Some(node.id);
+        }
+    }
+
+    None
 }
 
 fn main() {
@@ -84,7 +104,7 @@ fn main() {
                 "switch" => {
                     let workspace: u32 = args[2].parse().expect("Supplied argument was not a number");
                     let mut conn = i3ipc::I3Connection::connect().unwrap();
-                    let last_active = create_workspaces((&mut conn), workspace);
+                    let last_active = create_workspaces(&mut conn, workspace);
 
                     // Sleep, otherwise re-focusing will not work
                     let sleep_time = time::Duration::from_millis(100);
@@ -95,9 +115,24 @@ fn main() {
 
                    // conn.run_command(format!("focus output {}", last_active).as_ref());
                 },
-                "move" => {},
+                "move" => {
+                    let workspace: u32 = args[2].parse().expect("Supplied argument was not a number");
+                    let mut conn = i3ipc::I3Connection::connect().unwrap();
+
+                    let active_container = get_active_container_id(&mut conn).unwrap();
+                    let new_active = create_workspaces(&mut conn, workspace);
+
+                    conn.run_command(format!("[con_id=\"{}\"] move container to workspace {}", active_container, new_active).as_ref());
+
+                    // Sleep, otherwise re-focusing will not work
+                    let sleep_time = time::Duration::from_millis(100);
+                    thread::sleep(sleep_time);
+
+                    Command::new("i3-msg").arg(format!("workspace {}", new_active)).output()
+                        .ok().expect("Failed to execute.");
+                },
                 _ => {
-                    println!("Invalid command");
+                    println!("Invalid argument");
                 },
             }
 
