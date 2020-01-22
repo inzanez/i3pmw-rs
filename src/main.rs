@@ -2,7 +2,6 @@ use i3ipc::reply::{Output, Node};
 use i3ipc::I3Connection;
 use std::collections::HashMap;
 use std::env;
-use std::process::Command;
 use std::{thread, time};
 
 fn get_monitor_map(conn: &mut I3Connection) -> HashMap<String, u32> {
@@ -110,10 +109,7 @@ fn main() {
                     let sleep_time = time::Duration::from_millis(100);
                     thread::sleep(sleep_time);
 
-                    Command::new("i3-msg").arg(format!("workspace {}", last_active)).output()
-                        .ok().expect("Failed to execute.");
-
-                   // conn.run_command(format!("focus output {}", last_active).as_ref());
+                    conn.run_command(format!("workspace {}", last_active).as_ref());
                 },
                 "move" => {
                     let workspace: u32 = args[2].parse().expect("Supplied argument was not a number");
@@ -128,8 +124,7 @@ fn main() {
                     let sleep_time = time::Duration::from_millis(100);
                     thread::sleep(sleep_time);
 
-                    Command::new("i3-msg").arg(format!("workspace {}", new_active)).output()
-                        .ok().expect("Failed to execute.");
+                    conn.run_command(format!("workspace {}", new_active).as_ref());
                 },
                 _ => {
                     println!("Invalid argument");
