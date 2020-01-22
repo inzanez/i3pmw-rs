@@ -58,15 +58,19 @@ fn create_workspaces(conn: &mut I3Connection, num: u32) -> String {
 }
 
 fn find_active_node(node: &Node) -> Option<&Node> {
-    for node in &node.nodes {
-        if node.focused == true {
-            return Some(node);
+    for n in &node.nodes {
+        if n.focused == true {
+            return Some(n);
         }
     }
 
-    for node in &node.nodes {
-        if node.nodes.len() > 0 {
-            return find_active_node(node);
+    for n in &node.nodes {
+        if n.nodes.len() > 0 {
+            let active = find_active_node(n);
+
+            if active.is_some() {
+                return active;
+            }
         }
     }
 
@@ -76,10 +80,13 @@ fn find_active_node(node: &Node) -> Option<&Node> {
 fn get_active_container_id(conn: &mut I3Connection) -> Option<i64> {
     let tree = conn.get_tree().unwrap();
 
+    println!("{:?}", tree);
+
     for node in &(tree.nodes) {
         let active = find_active_node(node);
 
         if active.is_some() {
+            println!("{}", node.id);
             let node = active.unwrap();
             return Some(node.id);
         }
@@ -113,9 +120,9 @@ fn main() {
                 },
                 "move" => {
                     let workspace: u32 = args[2].parse().expect("Supplied argument was not a number");
-                    let mut conn = i3ipc::I3Connection::connect().unwrap();
+                    let mut conn = i3ipc::I3Connection::connect().expect("Could not connect to i3ipc");
 
-                    let active_container = get_active_container_id(&mut conn).unwrap();
+                    let active_container = get_active_container_id(&mut conn).expect("Could not get active container id");
                     let new_active = create_workspaces(&mut conn, workspace);
 
                     conn.run_command(format!("[con_id=\"{}\"] move container to workspace {}", active_container, new_active).as_ref());
